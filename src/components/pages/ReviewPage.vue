@@ -23,8 +23,6 @@ import { mapState, mapMutations } from "vuex";
 import Token from "../objects/Token";
 import TokenBlock from "../objects/TokenBlock";
 import ClassesBlock from "../objects/ClassesBlock.vue";
-import TokenManager from "../etc/token-manager";
-import Tokenizer from "../etc/tokenizer";
 import InfoBar from "../toolbars/InfoBar.vue";
 import SharedEditorFunctions from "./shared.vue";
 
@@ -32,9 +30,7 @@ export default {
   name: "ReviewPage",
   data: function () {
     return {
-      tm: new TokenManager([]),
-      currentSentence: {},
-      tokenizer: new Tokenizer(),
+      currentSentence: {}
     };
   },
   components: {
@@ -45,14 +41,9 @@ export default {
   },
   computed: {
     ...mapState([
-      "annotations",
-      "annotationHistory",
-      "classes",
-      "currentClass",
-      "currentIndex",
       "inputSentences",
-      "annotationPrecision",
-      "undoStack"
+      "annotations",
+      "classes"
     ]),
     // TODO: THIS SHOULD BE REWRITTEN BETTER
     eligibleTokens() {
@@ -69,23 +60,6 @@ export default {
         }
       }
       return renderedList;
-    }
-  },
-  watch: {
-    inputSentences() {
-      this.resetIndex();
-      this.tokenizeCurrentSentence();
-    },
-    annotations() {
-      if (this.currentAnnotation != this.annotations[this.currentIndex]) {
-        this.tokenizeCurrentSentence();
-      }
-    },
-    classes() {
-      this.tokenizeCurrentSentence();
-    },
-    annotationPrecision() {
-      this.tokenizeCurrentSentence();
     }
   },
   created() {

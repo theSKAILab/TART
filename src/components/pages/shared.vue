@@ -1,24 +1,12 @@
-<script>
+<script lang="ts">
 import { mapMutations, mapState } from "vuex";
-import TokenManager from "../etc/token-manager";
+import Tokenizer from "../classes/tokenizer";
+import TokenManager from "../classes/TokenManager";
 
 export default {
   name: "SharedEditorFunctions",
-  data: function () {
-    return {
-      tm: new TokenManager([]),
-    };
-  },
-  watch: {
-    tm: {
-      handler() {
-        this.save();
-      },
-      deep: true,
-    }
-  },
   computed: {
-    ...mapState(["currentPage"])
+    ...mapState(["currentPage", "currentIndex", "undoStack","classes","currentClass","REFFile"])
   },
   methods: {
     ...mapMutations(["nextSentence", "previousSentence", "resetIndex", "addUndoCreate", "addUndoDelete", "addUndoOverlapping"]),
@@ -41,7 +29,7 @@ export default {
               console.log(lastAction)
               // Gross fix
               // Basically remove all of the mentioned blocks and add them back with their previous state
-              for(var i = 0; i < lastAction.overlappingBlocks.length; i++) {
+              for(let i = 0; i < lastAction.overlappingBlocks.length; i++) {
                 this.tm.removeBlock(lastAction.overlappingBlocks[i].start);
               }
               this.tm.removeBlock(lastAction.newBlockStart, true);
@@ -49,7 +37,7 @@ export default {
               console.log(this.tm.tokens)
               this.tm.removeDuplicateBlocks();
               for(i = 0; i < lastAction.overlappingBlocks.length; i++) {
-                this.tm.addNewBlock(lastAction.overlappingBlocks[i].start, lastAction.overlappingBlocks[i].end, lastAction.overlappingBlocks[i].labelClass, lastAction.overlappingBlocks[i].previousState, this.currentPage);
+                this.tm.addNewBlock(lastAction.overlappingBlocks[i].start, lastAction.overlappingBlocks[i].end, lastAction.overlappingBlocks[i].labelClass, lastAction.overlappingBlocks[i].previousState, [], this.currentPage);
               }
               break;
             }
@@ -60,19 +48,14 @@ export default {
         while(this.undoStack.length > 0) { this.undo();}
         this.save();
     },
-        /**
+    /**
      * Tokenizes the current sentence and sets the TokenManager
-     */
+    */
     tokenizeCurrentSentence() {
-      this.currentSentence = this.inputSentences[this.currentIndex];
-      this.currentAnnotation = this.annotations[this.currentIndex];
+      this.currentSentence = this.REFFile.inputSentences()[this.currentIndex];
+      this.currentAnnotation = this.REFFile.annotations[this.currentIndex];
 
-      let tokens = this.tokenizer.tokenize(this.currentSentence.text);
-      let spans = this.tokenizer.span_tokenize(this.currentSentence.text);
-
-      let combined = tokens.map((t, i) => [spans[i][0], spans[i][1], t]);
-      this.tm = new TokenManager(this.classes);
-      this.tm.setTokensAndAnnotation(combined, this.currentAnnotation);
+      this.tm = new TokenManager(this.classes, Tokenizer.span_tokenize(this.currentSentence.text), this.currentAnnotation);
     },
     /**
      * Adds a new block to the TokenManager based on the current selection
@@ -116,11 +99,11 @@ export default {
           persistent: true
         }).onOk(() => {
           this.addUndoOverlapping({"oldBlocks": existingBlocks, "newBlockStart": start});
-          this.tm.addNewBlock(start, end, this.currentClass, "Suggested", this.currentPage);
+          this.tm.addNewBlock(start, end, this.currentClass, "Suggested", [], this.currentPage);
         })
         
       } else {
-        this.tm.addNewBlock(start, end, this.currentClass, this.currentPage == "annotate"? "Candidate": "Suggested", this.currentPage);
+        this.tm.addNewBlock(start, end, this.currentClass, this.currentPage == "annotate"? "Candidate": "Suggested", [], this.currentPage);
         if (this.tm.getBlockByStart(start)) this.addUndoCreate(this.tm.getBlockByStart(start));
       }
 

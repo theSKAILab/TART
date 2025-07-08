@@ -22,8 +22,7 @@ import { mapState, mapMutations } from "vuex";
 import Token from "../objects/Token";
 import TokenBlock from "../objects/TokenBlock";
 import ClassesBlock from "../objects/ClassesBlock.vue";
-import TokenManager from "../etc/token-manager";
-import Tokenizer from "../etc/tokenizer";
+import TokenManager from "../classes/TokenManager";
 import InfoBar from "../toolbars/InfoBar.vue";
 import SharedEditorFunctions from "./shared.vue";
 
@@ -31,9 +30,7 @@ export default {
   name: "AnnotationPage",
   data: function () {
     return {
-      tm: new TokenManager([]),
       currentSentence: {},
-      tokenizer: new Tokenizer(),
     };
   },
   components: {
@@ -44,13 +41,10 @@ export default {
   },
   computed: {
     ...mapState([
-      "annotations",
-      "annotationHistory",
       "classes",
       "currentClass",
       "currentIndex",
       "inputSentences",
-      "annotationPrecision",
       "undoStack"
     ]),
   },
@@ -59,17 +53,9 @@ export default {
       this.resetIndex();
       this.tokenizeCurrentSentence();
     },
-    annotations() {
-      if (this.currentAnnotation != this.annotations[this.currentIndex]) {
-        this.tokenizeCurrentSentence();
-      }
-    },
     classes() {
       this.tokenizeCurrentSentence();
     },
-    annotationPrecision() {
-      this.tokenizeCurrentSentence();
-    }
   },
   created() {
     // Add blocks for all paragraphs

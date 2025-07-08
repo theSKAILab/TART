@@ -150,7 +150,7 @@ export default {
     })
   },
   computed: {
-    ...mapState(["annotations", "classes","fileName","currentPage"]),
+    ...mapState(["classes","fileName","currentPage"]),
     titleBar() {
       return this.$store.state.fileName ? this.$store.state.fileName + " - " : "";
     }

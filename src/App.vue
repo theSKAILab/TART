@@ -67,10 +67,10 @@ export default {
     DragNDropOverlay
   },
   computed: {
-    ...mapState(["annotations", "classes", "currentPage"]),
+    ...mapState(["classes", "currentPage"]),
   },
   methods: {
-    ...mapMutations(["loadClasses", "loadAnnotations", "setInputSentences", "clearAllAnnotations", "resetIndex", "setCurrentPage", "loadFile"]),
+    ...mapMutations(["loadClasses", "loadAnnotations", "setInputSentences", "resetIndex", "setCurrentPage", "loadFile"]),
     onDragEnter() {
       if (this.currentPage == "start") this.overlayActive = true;
     },

@@ -1,4 +1,5 @@
 import { LocalStorage } from "quasar";
+import { REF_File, Paragraph } from "../components/classes/RichEntityFormat.ts";
 
 const niceColors = ["red-11", "blue-11", "light-green-11", "deep-orange-11", "pink-11", "light-blue-11", "lime-11", "brown-11", "purple-11", "cyan-11", "yellow-11", "grey-11", "deep-purple-11", "teal-11", "amber-11", "blue-grey-11", "indigo-11", "green-11", "orange-11"];
 
@@ -20,79 +21,30 @@ const mutations = {
   },
   processFile(state, payload) {
     // Clear Out Data
-    state.annotations = [];
     state.currentAnnotation = {};
     state.classes = [];
     state.currentClass = null;
     state.undoStack = [];
 
-    var file = payload;
     if (state.fileName.split(".")[1] == "json") {
-      file = JSON.parse(file);
-      file.annotations = file.annotations.map((item) => {
-        return [
-          item[1],
-          item[2]
-        ]
-      })
-      // Strip paragraph ID from the file
+      // Loading a JSON file
+      payload = JSON.parse(payload)
+      var file = new REF_File(payload.annotations, payload.classes);
     } else {
-      // This forces the text file into the annotation file format, thus allowing it to be loaded the same without special edge cases
-      file = file.replace(/(\r\n|\n|\r){2,}/gm, "\n");
-      file = file.split(state.separator);
-      file = file.map((item) => {
+      // Loading a text file
+      payload = payload.replace(/(\r\n|\n|\r){2,}/gm, "\n").split("\n")
+      var file = new REF_File(payload.map((item) => {
         return [
           item,
           {
             entities: []
           }
         ]
-      })
-      file = {
-        annotations: file,
-        classes: {}
-      }
+      }));
     }
 
-    // Process Entities in Rich Entity Format (REF) used in this software
-    // Additionally, stores the original state of the sentence annotations
-    // This is useful for "undo all", but may eventually be replace with recursive execution of undo stack
-    for(var i = 0; i < file.annotations.length; i++) {
-      for (var j = 0; j < file.annotations[i][1].entities.length; j++) {
-        var sentenceOriginalState = []
-        var entity = file.annotations[i][1].entities[j];
-        if (entity.length >= 3) {
-            
-            const thisAnnotationHistory = entity[3]
-            const latestEntry = thisAnnotationHistory[thisAnnotationHistory.length - 1];
-
-            const historyEntry = {
-              start: entity[1],
-              end: entity[2],
-              history: thisAnnotationHistory,
-              currentState: latestEntry[1],
-              name: latestEntry[3],
-              labelClass: {name: latestEntry[0]},
-            }
-           
-            sentenceOriginalState.push(historyEntry);
-
-            // Replace the entity with the history entry
-            file.annotations[i][1].entities[j] = historyEntry;
-          }
-      
-        if (file.annotations[i][1].entities.length) state.annotationHistory[i] = sentenceOriginalState;
-        }
-    }
-
-    state.originalText = file.annotations.map((item) => item[0]).join(state.separator);
-    state.inputSentences = state.originalText.split(state.separator).map((s, i) => ({ id: i, text: s }));
-    state.annotations = file.annotations.map((sentence) => {
-      return {
-        text: sentence[0],
-        entities: sentence[1].entities,
-      }
-    })
+    state.inputSentences = file.inputSentences();
+    state.REFFile = file;
 
     if (file.classes && Array.isArray(file.classes)) {
        mutations.loadClasses(state, file.classes);
@@ -136,23 +88,18 @@ const mutations = {
     state.currentClass = state.classes[payload];
   },
   addAnnotation(state, payload) {
-    state.annotations[state.currentIndex] = payload;
     state.currentAnnotation = payload;
-  },
-  clearAllAnnotations(state) {
-    state.annotations = [];
-    state.currentAnnotation = {};
   },
   nextSentence(state) {
     if (state.currentIndex < state.inputSentences.length - 1) {
       state.currentIndex += 1;
-      state.currentAnnotation = state.annotations[state.currentIndex] || {};
+      state.currentAnnotation = state.REFFile.annotations[state.currentIndex];
     }
   },
   previousSentence(state) {
     if (state.currentIndex > 0) {
       state.currentIndex -= 1;
-      state.currentAnnotation = state.annotations[state.currentIndex];
+      state.currentAnnotation = state.REFFile.annotations[state.currentIndex];
     }
   },
   resetIndex(state) {
@@ -195,11 +142,6 @@ const mutations = {
     state.undoStack.sort((a, b) => b.timestamp - a.timestamp);
   },
   loadFile(state, file) {
-    // onFileSelected() is called if the user clicks and manually
-    //    selects a file. If they drag and drop, that is handled in
-    //    App.vue. If you modify this function, you may also want to
-    //    modify App#onDrop(), App#processFileDrop(), and
-    //    LoadTextFile#onFileSelected() to match
     state.fileName = file.name;
     let fileType = file.name.split('.').pop();
     state.lastSavedTimestamp = null;
@@ -258,9 +200,6 @@ export default {
   state() {
     let tags = LocalStorage.getItem("tags");
     return {
-      annotationHistory: {},
-      annotationPrecision: "word",
-      annotations: [],
       classes: tags || [],
       currentAnnotation: {},
       currentClass: (tags && tags[0]) || {},
@@ -270,10 +209,8 @@ export default {
       fileName: null,
       inputSentences: [],
       lastSavedTimestamp: null,
-      originalText: "",
-      rejectedAnnotations: [],
-      separator: "\n",
       undoStack: [],
+      REFFile: null,
     };
   },
   mutations,
