@@ -5,32 +5,32 @@
       <div class="row">
         <div class="tags">
           <q-chip
-            v-for="(cl, index) in classes"
-            :key="cl.id"
+            v-for="(label, index) in this.allLabels"
+            :key="label.id"
             outline
             square
             style="height: 2rem;"
-            :color="cl.color.replace('11', '12')"
+            :color="label.color.replace('11', '12')"
             clickable
-            @click="setCurrentClass(index)"
+            @click="labelManager.setCurrentLabel(label.name)"
             :removable="showDeleteButtons"
-            @remove="handleRemoveClass(cl.id, cl.name)"
+            @remove="promptDelete(label.name)"
           >
             <q-avatar
-              v-if="cl.id === currentClass.id"
-              :color="cl.color.replace('11', '12')"
+              v-if="label.id === labelManager.currentLabel.id"
+              :color="label.color.replace('11', '12')"
               style="height: 2rem"
               text-color="white"
               :icon="'fa fa-check'"
             ></q-avatar>
             <q-avatar
-              v-if="cl.id !== currentClass.id"
-              :color="cl.color.replace('11', '12')"
+              v-if="label.id !== labelManager.currentLabel.id"
+              :color="label.color.replace('11', '12')"
               style="height: 2rem"
               text-color="white"
               font-size="16px"
             >{{ index + 1 }}</q-avatar>
-            <p :class="['q-mb-none', $q.dark.isActive ? 'text-grey-3' : 'text-grey-9']">{{ cl.name }}</p>
+            <p :class="['q-mb-none', $q.dark.isActive ? 'text-grey-3' : 'text-grey-9']">{{ label.name }}</p>
           </q-chip>
         </div>
         <q-space></q-space>
@@ -38,7 +38,7 @@
           <q-input
             bottom-slots
             v-model="newClassName"
-            v-if="showNewClassInput || classes.length === 0"
+            v-if="$store.state.currentPage !== 'review' || this.allLabels.length == 0"
             hint="Enter a NER Tag and click [+] to add it"
             dense
             autofocus
@@ -50,7 +50,7 @@
                 flat
                 color="primary"
                 icon="fa fa-plus"
-                @click="saveNewClass"
+                @click="saveLabel"
               />
               <q-btn
                 round
@@ -82,54 +82,45 @@
     </div>
   </template>
   
-  <script>
-  import { mapState, mapMutations, mapActions } from "vuex";
+  <script lang="ts">
+  import { mapState } from "vuex";
   export default {
     name: "ClassesBlock",
     data() {
       return {
-        showNewClassInput: false,
         newClassName: "",
         showDeleteButtons: false,
       };
     },
     computed: {
-      ...mapState(["classes", "currentClass"]),
-    },
-    watch: {
-      newClassName(now, then) {
-        if (now != then) {
-          this.newClassName = now.toUpperCase();
-        }
+      ...mapState(["labelManager"]),
+      allLabels() {
+        return this.labelManager.allLabels;
       },
     },
+    watch: {
+      allLabels() {}
+    },
     methods: {
-      ...mapMutations(["setCurrentClass"]),
-      ...mapActions(["createNewClass", "deleteClass"]),
-      handleRemoveClass(class_id, className) {
+      promptDelete(className: string) {
         this.$q.dialog({
           title: 'Tag Removal Confirmation',
           message: 'Are you sure you want to remove the tag `' + className + '`?',
           cancel: true,
           persistent: true
         }).onOk(() => {
-          this.deleteClass(class_id);
+          this.labelManager.deleteLabel(className);
         })
       },
-      saveNewClass() {
-        if (!this.newClassName) {
-          return;
-        }
-        const self = this;
-        this.createNewClass(this.newClassName).then(() => {
-          self.showNewClassInput = false;
-          self.newClassName = "";
-        });
-      },
+      saveLabel() {
+        if (!this.newClassName) return;
+        this.labelManager.addLabel(this.newClassName);
+        self.newClassName = "";
+      }
     },
   };
+  // TODO: CSS BELOW SHOULD BE MOVED TO A GLOBAL STYLE SHEET
   </script>
-  
   <style lang="css" scoped>
   .color-box {
     width: 1rem;

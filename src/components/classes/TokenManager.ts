@@ -1,24 +1,31 @@
 import { Entity, LabelClass, History, Paragraph } from "./RichEntityFormat";
+import { LabelManager } from "./LabelManager";
 
-export class TMToken {
-  public type: string;
+export interface TMTokens {
+  start: number|undefined;
+  end: number|undefined;
+  currentState: string|undefined;
+  previousState?: string|undefined; // Optional field for previous state in review mode
+}
+
+export class TMToken implements TMTokens {
+  public type: string = "token";
   public start: number;
   public end: number;
-  public text: string;
   public currentState: string;
   public previousState?: string; // Optional field for previous state in review mode
 
-  constructor(type: string, start: number, end: number, text: string, currentState: string) {
-    this.type = type;
+  public text: string;
+
+  constructor(start: number, end: number, text: string, currentState: string) {
     this.start = start;
     this.end = end;
     this.text = text;
     this.currentState = currentState;
   }
 
-  public static fromObject(obj: any[]): TMToken {
+  public static fromObject(obj: object[]): TMToken {
     return new TMToken(
-      "token",
       obj[0],
       obj[1],
       obj[2],
@@ -27,18 +34,19 @@ export class TMToken {
   }
 }
 
-export class TMTokenBlock {
+export class TMTokenBlock implements TMTokens {
   public type: string = "token-block"; // Default type for token blocks
   public start: number;
   public end: number;
-  public tokens: TMToken[];
-  public labelClass: any; // TODO: MAKE SPECIFIC LATER
   public currentState: string;
-  public reviewed: boolean;
-  public history: any[]; // TODO: MAKE SPECIFIC LATER
   public previousState?: string; // Optional field for previous state in review mode
 
-  constructor(start: number, end: number, tokens: TMToken[], labelClass: any, currentState: string, reviewed: boolean = false, history: any[] = []) {
+  public tokens: TMToken[];
+  public labelClass: LabelClass;
+  public reviewed: boolean;
+  public history: History[];
+
+  constructor(start: number, end: number, tokens: TMToken[], labelClass: LabelClass, currentState: string, reviewed: boolean = false, history: History[] = []) {
     this.start = start;
     this.end = end;
     this.tokens = tokens;
@@ -47,36 +55,47 @@ export class TMTokenBlock {
     this.reviewed = reviewed;
     this.history = history;
   }
+
+  public exportAsEntity(): Entity {
+    return new Entity(
+      this.start, // Start index of the entity
+      this.end, // End index of the entity
+      this.history,
+      this.labelClass
+    );
+  }
 }
 
-export default class TokenManager {
-  public classes: LabelClass[];
-  public tokens: (TMToken|TMTokenBlock)[]; // Array of TMToken or TMTokenBlock objects
+export class TokenManager {
+  public labelManager: LabelManager;
+  public tokens: TMTokens[]; // Array of TMToken or TMTokenBlock objects
+  public get tokenBlocks(): TMTokenBlock[] {
+    return this.tokens.filter((token: TMTokens) => token.type == "token-block") as TMTokenBlock[];
+  }
 
-  constructor(classes: LabelClass[], tokens: object[], currentParagraph: Paragraph|null = null) {
-      this.classes = classes;
-      this.tokens = tokens.map((t: object) => TMToken.fromObject(t));
+  constructor(labelManager: LabelManager, tokens: object[], currentParagraph: Paragraph|null = null) {
+    this.labelManager = labelManager;
+    this.tokens = tokens.map((t: object) => TMToken.fromObject(t));
 
-      if (currentParagraph) {
-          // Reset previous annotation state
-          for (let i = 0; i < currentParagraph.entities.length; i++) {
-              const entity: Entity = currentParagraph.entities[i];
-              entity.labelClass = this.classes.find(c => c.name === entity.labelName);
-              this.addBlockFromEntity(entity);
-          }
-      }
+    if (currentParagraph) {
+        // Reset previous annotation state
+        currentParagraph.entities.forEach((entity: Entity) => {
+          entity.labelClass = this.labelManager.getLabelByName(entity.labelName);
+          this.addBlockFromStructure(entity);
+        });
+    }
   }
 
   public addNewBlock(start: number, end: number, labelClass: LabelClass|undefined, currentState: string, history: History[] = [], runMode: string = "annotate"): void {
     const selectionStart: number = end < start ? end : start;
     const selectionEnd: number = end > start ? end : start;
-    let overlappedBlock: (TMToken|TMTokenBlock)|null = null;
+    let overlappedBlock: TMTokens|null = null;
 
     let selectedTokens: TMToken[] = [];
-    const newTokens: (TMToken|TMTokenBlock)[] = [];
+    const newTokens: TMTokens[] = [];
 
     for(let i:number = 0; i < this.tokens.length; i++) {
-      const currentToken: TMToken|TMTokenBlock = this.tokens[i];
+      const currentToken: TMTokens = this.tokens[i];
       if (currentToken.start >= selectionEnd && selectedTokens.length) {
         // We are outside of the selection, add the new block here
         newTokens.push(new TMTokenBlock(
@@ -138,7 +157,7 @@ export default class TokenManager {
     this.tokens = newTokens;
   }
 
-  public addBlockFromEntity(entity: Entity): void {
+  public addBlockFromStructure(entity: Entity|TMTokenBlock): void {
     this.addNewBlock(
       entity.start,
       entity.end,
@@ -150,27 +169,27 @@ export default class TokenManager {
   }
 
   public removeBlock(start: number, reintroduceTokens: boolean = true): void {
-    const newTokens: (TMToken|TMTokenBlock)[] = [];
-    for (let i: number = 0; i < this.tokens.length; i++) {
+    const newTokens: TMTokens[] = [];
+    for (let i = 0; i < this.tokens.length; i++) {
       // If there is a token block that is targeted for removal
       // Remove it and add the tokens back to the array
       // Note: Skip this step for instances like when undoing an overlapping block action
-      if (this.tokens[i].type == "token-block" && this.tokens[i].start == start) {
+      if (this.tokens[i] instanceof TMTokenBlock && this.tokens[i].start == start) {
         if (reintroduceTokens) newTokens.push(...this.tokens[i].tokens);
       } else {
         newTokens.push(this.tokens[i]);
       }
-      this.tokens = newTokens;
     }
+    this.tokens = newTokens;
   }
 
   public removeDuplicateBlocks(): void {
     this.tokens = [...new Set(this.tokens.sort((a, b) => a.start - b.start))]
   }
 
-  public getBlockByStart(start: number): TMTokenBlock|TMToken|null {
+  public getBlockByStart(start: number): TMTokens|null {
     for (let i = 0; i < this.tokens.length; i++) {
-      const token: TMTokenBlock|TMToken = this.tokens[i];
+      const token: TMTokens = this.tokens[i];
       if (token.type === "token-block" && token.start === start) {
         return token;
       }
@@ -178,11 +197,11 @@ export default class TokenManager {
     return null;
   }
 
-  public isOverlapping(start: number, end: number): (TMToken|TMTokenBlock)[]|null {
-    const overlappingBlocks: (TMToken|TMTokenBlock)[] = [];
+  public isOverlapping(start: number, end: number): TMTokens[]|null {
+    const overlappingBlocks: TMTokens[] = [];
 
     for (let i = 0; i < this.tokens.length; i++) {
-      const currentToken: TMToken|TMTokenBlock = this.tokens[i];
+      const currentToken: TMTokens = this.tokens[i];
       if (currentToken.type === "token-block") {
         if (
           (
@@ -197,6 +216,6 @@ export default class TokenManager {
 
     return overlappingBlocks.length > 0? overlappingBlocks : null;
   }
-
-  //TODO: IMPLEMENT export
 }
+
+export default TokenManager;

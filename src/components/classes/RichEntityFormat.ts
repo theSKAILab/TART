@@ -34,6 +34,7 @@
 //     ],
 //   ]
 // }
+import { Label } from "./LabelManager";
 export const REF_VERSION: string = "V.0.1.0";
 
 /**
@@ -120,7 +121,7 @@ export class Entity {
     public currentState: string | undefined; // Current state of the entity, e.g., "active", "inactive"
     public name: string | undefined; // Name of last annotator
     public labelName: string | undefined; // Name of the label assigned to the entity
-    public labelClass: LabelClass | undefined; // Label class of the entity
+    public labelClass: LabelClass | Label | undefined; // Label class of the entity
     public history: History[]; // Array to hold the history of label changes
     
     public latestEntry = () => {
@@ -138,10 +139,20 @@ export class Entity {
     }
 
     // Constructor for the Entity class
-    constructor(start: number, end: number, history: object[] = []) {
+    constructor(start: number, end: number, history: object[]|History[] = [], labelClass: LabelClass|undefined = undefined) {
         this.start = start; // Start index of the entity
         this.end = end; // End index of the entity
-        this.history = history.map(historyEntry => History.fromJSON(historyEntry)); // Array to hold the history of label changes, casted
+
+        if (history[0] instanceof History) {
+            this.history = history;
+        } else {
+            this.history = history.map(historyEntry => History.fromJSON(historyEntry)); // Array to hold the history of label changes, casted
+        }
+
+        if (labelClass) {
+            this.labelClass = labelClass; // Set the label class if provided
+            this.labelName = this.labelClass.name; // Set the label name from the label class
+        }
         this.setFromLastHistoryEntry(); // Set the current state, name, and label class from the last history entry
     }
 
@@ -177,7 +188,7 @@ export class Entity {
         } else {
             this.currentState = "Candidate"; // Default state if no history is present
             this.name = ""; // Default name if no history is present
-            this.labelClass = undefined; // Default label class if no history is present
+            this.labelName = ""; // Default label name if no history is present
         }
     }
 }
@@ -241,7 +252,7 @@ export class History {
  * @param {string} color - The color associated with the label class.
 */
 export class LabelClass {
-    public id: string; // Unique identifier for the label class
+    public id: number; // Unique identifier for the label class
     public name: string; // Name of the label class
     public color: string; // Color associated with the label class
 
@@ -254,7 +265,7 @@ export class LabelClass {
         }
     }
 
-    constructor(id, name, color) {
+    constructor(id: number, name: string, color: string) {
         this.id = id;
         this.name = name;
         this.color = color;

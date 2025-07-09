@@ -1,32 +1,43 @@
 <script lang="ts">
 import { mapMutations, mapState } from "vuex";
 import Tokenizer from "../classes/tokenizer";
-import TokenManager from "../classes/TokenManager";
+import { TokenManager, TMTokenBlock } from "../classes/TokenManager";
 
 export default {
   name: "SharedEditorFunctions",
   computed: {
-    ...mapState(["currentPage", "currentIndex", "undoStack","classes","currentClass","REFFile"])
+    ...mapState(["currentPage", "currentIndex", "undoStack","labelManager","labelManager","REFFile"])
+  },
+  data() {
+    return {
+      tm: null,
+    }
+  },
+  watch: {
+    tm: {
+      handler() {
+        this.save();
+      },
+      deep: true,
+    }
   },
   methods: {
     ...mapMutations(["nextSentence", "previousSentence", "resetIndex", "addUndoCreate", "addUndoDelete", "addUndoOverlapping"]),
     undo() {
-        if (this.undoStack.length > 0) {
-            const lastAction = this.undoStack.pop();
-            console.log("Undoing action:", lastAction);
-            switch (lastAction.type) {
+      if (this.undoStack.length > 0) {
+          const lastAction = this.undoStack.pop();
+          console.log("Undoing action:", lastAction);
+          switch (lastAction.type) {
             case 'remove':
               this.tm.removeBlock(lastAction.start);
               break;
             case 'create':
-              this.tm.addBlockFromBlock(lastAction.oldBlock);
+              this.tm.addBlockFromStructure(lastAction.oldBlock);
               break;
             case 'update':
-              this.tm.removeBlock(lastAction.oldBlock.start);
-              this.tm.addBlockFromBlock(lastAction.oldBlock);
+              this.tm.addBlockFromStructure(lastAction.oldBlock);
               break;
             case 'overlapping':
-              console.log(lastAction)
               // Gross fix
               // Basically remove all of the mentioned blocks and add them back with their previous state
               for(let i = 0; i < lastAction.overlappingBlocks.length; i++) {
@@ -34,15 +45,14 @@ export default {
               }
               this.tm.removeBlock(lastAction.newBlockStart, true);
               // Add the old blocks back
-              console.log(this.tm.tokens)
               this.tm.removeDuplicateBlocks();
               for(i = 0; i < lastAction.overlappingBlocks.length; i++) {
                 this.tm.addNewBlock(lastAction.overlappingBlocks[i].start, lastAction.overlappingBlocks[i].end, lastAction.overlappingBlocks[i].labelClass, lastAction.overlappingBlocks[i].previousState, [], this.currentPage);
               }
               break;
-            }
-            this.save();
-        }
+          }
+          this.save();
+      }
     },
     undoAll() {
         while(this.undoStack.length > 0) { this.undo();}
@@ -54,8 +64,7 @@ export default {
     tokenizeCurrentSentence() {
       this.currentSentence = this.REFFile.inputSentences()[this.currentIndex];
       this.currentAnnotation = this.REFFile.annotations[this.currentIndex];
-
-      this.tm = new TokenManager(this.classes, Tokenizer.span_tokenize(this.currentSentence.text), this.currentAnnotation);
+      this.tm = new TokenManager(this.labelManager, Tokenizer.span_tokenize(this.currentSentence.text), this.currentAnnotation);
     },
     /**
      * Adds a new block to the TokenManager based on the current selection
@@ -77,7 +86,7 @@ export default {
       }
 
       // No classes available to tag
-      if (!this.classes.length && selection.anchorNode) {
+      if (!this.labelManager.lastId && selection.anchorNode) {
         this.$q.dialog({
           title: 'No Tags Available',
           message: 'Please add some Tags before tagging.',
@@ -99,11 +108,11 @@ export default {
           persistent: true
         }).onOk(() => {
           this.addUndoOverlapping({"oldBlocks": existingBlocks, "newBlockStart": start});
-          this.tm.addNewBlock(start, end, this.currentClass, "Suggested", [], this.currentPage);
+          this.tm.addNewBlock(start, end, this.labelManager.currentLabel, "Suggested", [], this.currentPage);
         })
         
       } else {
-        this.tm.addNewBlock(start, end, this.currentClass, this.currentPage == "annotate"? "Candidate": "Suggested", [], this.currentPage);
+        this.tm.addNewBlock(start, end, this.labelManager.currentLabel, this.currentPage == "annotate"? "Candidate": "Suggested", [], this.currentPage);
         if (this.tm.getBlockByStart(start)) this.addUndoCreate(this.tm.getBlockByStart(start));
       }
 
@@ -115,7 +124,7 @@ export default {
      * Removes TokenBlock from the TokenManager
      * @param {Number} blockStart - The start position of the block to remove
      */
-    onRemoveBlock(blockStart) {
+    onRemoveBlock(blockStart: number) {
       this.addUndoDelete(this.tm.getBlockByStart(blockStart));
       this.tm.removeBlock(blockStart);
       this.save();
@@ -124,10 +133,7 @@ export default {
      * Saves the current annotation to the store
      */
     save() {
-      this.$store.commit("addAnnotation", {
-        text: this.currentSentence.text,
-        entities: this.tm.exportAsAnnotation(),
-      });
+      this.REFFile.annotations[this.currentIndex].entities = this.tm.tokenBlocks.map((block: TMTokenBlock) => block.exportAsEntity());
     },
     beforeLeave() {
       return "Leaving this page will discard any unsaved changes.";

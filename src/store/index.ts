@@ -1,5 +1,7 @@
 import { LocalStorage } from "quasar";
-import { REF_File, Paragraph } from "../components/classes/RichEntityFormat.ts";
+import { REF_File } from "../components/classes/RichEntityFormat.ts";
+import { TMTokenBlock } from "../components/classes/tokenmanager.ts";
+import { LabelManager } from "../components/classes/LabelManager.ts";
 
 const niceColors = ["red-11", "blue-11", "light-green-11", "deep-orange-11", "pink-11", "light-blue-11", "lime-11", "brown-11", "purple-11", "cyan-11", "yellow-11", "grey-11", "deep-purple-11", "teal-11", "amber-11", "blue-grey-11", "indigo-11", "green-11", "orange-11"];
 
@@ -26,28 +28,36 @@ const mutations = {
     state.currentClass = null;
     state.undoStack = [];
 
+    let file;
     if (state.fileName.split(".")[1] == "json") {
       // Loading a JSON file
       payload = JSON.parse(payload)
-      var file = new REF_File(payload.annotations, payload.classes);
+      file = new REF_File(payload.annotations, payload.classes);
     } else {
       // Loading a text file
       payload = payload.replace(/(\r\n|\n|\r){2,}/gm, "\n").split("\n")
-      var file = new REF_File(payload.map((item) => {
+      payload = payload.map((item) => {
         return [
+          null,
           item,
           {
             entities: []
           }
         ]
-      }));
+      })
+      payload = {
+        annotations: payload,
+        classes: []
+      }
+      file = new REF_File(payload.annotations, payload.classes);
     }
 
     state.inputSentences = file.inputSentences();
     state.REFFile = file;
 
+    // Setup the ClassManager
     if (file.classes && Array.isArray(file.classes)) {
-       mutations.loadClasses(state, file.classes);
+      state.labelManager = LabelManager.fromREF(state.REFFile);
     }
   },
   //TODO: REPLACE COMMIT CALLS WITH THIS MUTATION
@@ -105,27 +115,29 @@ const mutations = {
   resetIndex(state) {
     state.currentIndex = 0;
   },
+
+
   // Global Undo Stack
   addUndoCreate(state, block) {
-    var newUndo = {
+    let newUndo = {
       type: "remove",
       start: block.start,
     }
     state.undoStack.push(newUndo);
     state.undoStack.sort((a, b) => b.timestamp - a.timestamp);
   },
-  addUndoDelete(state, removedBlock) {
-    var newUndo = {
+  addUndoDelete(state, removedBlock: TMTokenBlock) {
+    let newUndo = {
       type: "create",
       oldBlock: removedBlock,
     };
     state.undoStack.push(newUndo);
     state.undoStack.sort((a, b) => b.timestamp - a.timestamp);
   },
-  addUndoUpdate(state, oldBlock) {
+  addUndoUpdate(state, oldBlock: TMTokenBlock) {
     // on action side, deletes block and adds back old block in place
     // differs from delete in that it expects no blocks to be there
-    var newUndo = {
+    let newUndo = {
       type: "update",
       oldBlock: oldBlock
     };
@@ -133,7 +145,7 @@ const mutations = {
     state.undoStack.sort((a, b) => b.timestamp - a.timestamp);
   },
   addUndoOverlapping(state, {oldBlocks, newBlockStart}) {
-    var newUndo = {
+    let newUndo = {
       type: "overlapping",
       overlappingBlocks: oldBlocks,
       newBlockStart: newBlockStart,
@@ -211,6 +223,7 @@ export default {
       lastSavedTimestamp: null,
       undoStack: [],
       REFFile: null,
+      labelManager: null, // Placeholder for LabelManager instance
     };
   },
   mutations,
