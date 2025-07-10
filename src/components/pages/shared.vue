@@ -1,12 +1,12 @@
 <script lang="ts">
-import { mapMutations, mapState } from "vuex";
-import Tokenizer from "../classes/tokenizer";
-import { TokenManager, TMTokenBlock } from "../classes/TokenManager";
+import { mapMutations, mapState } from 'vuex'
+import Tokenizer from '../classes/tokenizer'
+import { TokenManager, TMTokenBlock } from '../classes/TokenManager'
 
 export default {
-  name: "SharedEditorFunctions",
+  name: 'SharedEditorFunctions',
   computed: {
-    ...mapState(["currentPage", "currentIndex", "undoStack","labelManager","labelManager","REFFile"])
+    ...mapState(['currentPage', 'currentIndex', 'undoStack', 'labelManager', 'annotationManager']),
   },
   data() {
     return {
@@ -16,73 +16,96 @@ export default {
   watch: {
     tm: {
       handler() {
-        this.save();
+        this.save()
       },
       deep: true,
-    }
+    },
   },
   methods: {
-    ...mapMutations(["nextSentence", "previousSentence", "resetIndex", "addUndoCreate", "addUndoDelete", "addUndoOverlapping"]),
+    ...mapMutations([
+      'nextSentence',
+      'previousSentence',
+      'resetIndex',
+      'addUndoCreate',
+      'addUndoDelete',
+      'addUndoOverlapping',
+    ]),
     undo() {
       if (this.undoStack.length > 0) {
-          const lastAction = this.undoStack.pop();
-          console.log("Undoing action:", lastAction);
-          switch (lastAction.type) {
-            case 'remove':
-              this.tm.removeBlock(lastAction.start);
-              break;
-            case 'create':
-              this.tm.addBlockFromStructure(lastAction.oldBlock);
-              break;
-            case 'update':
-              this.tm.addBlockFromStructure(lastAction.oldBlock);
-              break;
-            case 'overlapping':
-              // Gross fix
-              // Basically remove all of the mentioned blocks and add them back with their previous state
-              for(let i = 0; i < lastAction.overlappingBlocks.length; i++) {
-                this.tm.removeBlock(lastAction.overlappingBlocks[i].start);
-              }
-              this.tm.removeBlock(lastAction.newBlockStart, true);
-              // Add the old blocks back
-              this.tm.removeDuplicateBlocks();
-              for(i = 0; i < lastAction.overlappingBlocks.length; i++) {
-                this.tm.addNewBlock(lastAction.overlappingBlocks[i].start, lastAction.overlappingBlocks[i].end, lastAction.overlappingBlocks[i].labelClass, lastAction.overlappingBlocks[i].previousState, [], this.currentPage);
-              }
-              break;
-          }
-          this.save();
+        const lastAction = this.undoStack.pop()
+        console.log('Undoing action:', lastAction)
+        switch (lastAction.type) {
+          case 'remove':
+            this.tm.removeBlock(lastAction.start)
+            break
+          case 'create':
+            this.tm.addBlockFromStructure(lastAction.oldBlock)
+            break
+          case 'update':
+            this.tm.addBlockFromStructure(lastAction.oldBlock)
+            break
+          case 'overlapping':
+            // Gross fix
+            // Basically remove all of the mentioned blocks and add them back with their previous state
+            for (let i = 0; i < lastAction.overlappingBlocks.length; i++) {
+              this.tm.removeBlock(lastAction.overlappingBlocks[i].start)
+            }
+            this.tm.removeBlock(lastAction.newBlockStart, true)
+            // Add the old blocks back
+            this.tm.removeDuplicateBlocks()
+            for (i = 0; i < lastAction.overlappingBlocks.length; i++) {
+              this.tm.addNewBlock(
+                lastAction.overlappingBlocks[i].start,
+                lastAction.overlappingBlocks[i].end,
+                lastAction.overlappingBlocks[i].labelClass,
+                lastAction.overlappingBlocks[i].previousState,
+                [],
+                this.currentPage,
+              )
+            }
+            break
+        }
+        this.save()
       }
     },
     undoAll() {
-        while(this.undoStack.length > 0) { this.undo();}
-        this.save();
+      while (this.undoStack.length > 0) {
+        this.undo()
+      }
+      this.save()
     },
     /**
      * Tokenizes the current sentence and sets the TokenManager
-    */
+     */
     tokenizeCurrentSentence() {
-      this.currentSentence = this.REFFile.inputSentences()[this.currentIndex];
-      this.currentAnnotation = this.REFFile.annotations[this.currentIndex];
-      this.tm = new TokenManager(this.labelManager, Tokenizer.span_tokenize(this.currentSentence.text), this.currentAnnotation);
+      this.tm = new TokenManager(
+        this.labelManager,
+        Tokenizer.span_tokenize(this.annotationManager.inputSentences[this.currentIndex].text),
+        this.annotationManager.annotations[this.currentIndex],
+      )
     },
     /**
      * Adds a new block to the TokenManager based on the current selection
      */
     selectTokens() {
-      let selection = document.getSelection();
-      if (selection.anchorOffset === selection.focusOffset && selection.anchorNode === selection.focusNode) {return; }
+      const selection = document.getSelection()
+      if (
+        selection.anchorOffset === selection.focusOffset &&
+        selection.anchorNode === selection.focusNode
+      ) {
+        return
+      }
 
-      const rangeStart = selection.getRangeAt(0);
-      const rangeEnd = selection.getRangeAt(selection.rangeCount - 1);
-      
-      let start, end;
+      const rangeStart = selection.getRangeAt(0)
+      const rangeEnd = selection.getRangeAt(selection.rangeCount - 1)
+
+      let start, end
       try {
-        start = parseInt(rangeStart.startContainer.parentElement.id.replace("t", ""));
-        let offsetEnd = parseInt(rangeEnd.endContainer.parentElement.id.replace("t", ""));
-        end = offsetEnd + rangeEnd.endOffset;
+        start = parseInt(rangeStart.startContainer.parentElement.id.replace('t', ''))
+        const offsetEnd = parseInt(rangeEnd.endContainer.parentElement.id.replace('t', ''))
+        end = offsetEnd + rangeEnd.endOffset
       } catch {
-        return;
+        return
       }
 
       // No classes available to tag
@@ -91,33 +114,49 @@ export default {
           title: 'No Tags Available',
           message: 'Please add some Tags before tagging.',
         })
-        selection.empty();
-        return;
-      }
-      
-      // Attempt to create a new block
-      
-      // Determine if the selection will overlap with an existing block and add to undo stack accordingly
-      var existingBlocks = this.tm.isOverlapping(start, end);
-      if (existingBlocks) {
-        // Prompt to user to confirm overlapping blocks
-        this.$q.dialog({
-          title: 'Overlapping Annotations',
-          message: 'Your selection overlaps with existing annotations. Continuing will apply your current selection to the existing block. Do you want to proceed?',
-          cancel: true,
-          persistent: true
-        }).onOk(() => {
-          this.addUndoOverlapping({"oldBlocks": existingBlocks, "newBlockStart": start});
-          this.tm.addNewBlock(start, end, this.labelManager.currentLabel, "Suggested", [], this.currentPage);
-        })
-        
-      } else {
-        this.tm.addNewBlock(start, end, this.labelManager.currentLabel, this.currentPage == "annotate"? "Candidate": "Suggested", [], this.currentPage);
-        if (this.tm.getBlockByStart(start)) this.addUndoCreate(this.tm.getBlockByStart(start));
+        selection.empty()
+        return
       }
 
-      selection.empty();
-      this.save();
+      // Attempt to create a new block
+
+      // Determine if the selection will overlap with an existing block and add to undo stack accordingly
+      const existingBlocks = this.tm.isOverlapping(start, end)
+      if (existingBlocks) {
+        // Prompt to user to confirm overlapping blocks
+        this.$q
+          .dialog({
+            title: 'Overlapping Annotations',
+            message:
+              'Your selection overlaps with existing annotations. Continuing will apply your current selection to the existing block. Do you want to proceed?',
+            cancel: true,
+            persistent: true,
+          })
+          .onOk(() => {
+            this.addUndoOverlapping({ oldBlocks: existingBlocks, newBlockStart: start })
+            this.tm.addNewBlock(
+              start,
+              end,
+              this.labelManager.currentLabel,
+              'Suggested',
+              [],
+              this.currentPage,
+            )
+          })
+      } else {
+        this.tm.addNewBlock(
+          start,
+          end,
+          this.labelManager.currentLabel,
+          this.currentPage == 'annotate' ? 'Candidate' : 'Suggested',
+          [],
+          this.currentPage,
+        )
+        if (this.tm.getBlockByStart(start)) this.addUndoCreate(this.tm.getBlockByStart(start))
+      }
+
+      selection.empty()
+      this.save()
     },
     // Callbacks for Token and TokenBlock components
     /**
@@ -125,20 +164,21 @@ export default {
      * @param {Number} blockStart - The start position of the block to remove
      */
     onRemoveBlock(blockStart: number) {
-      this.addUndoDelete(this.tm.getBlockByStart(blockStart));
-      this.tm.removeBlock(blockStart);
-      this.save();
+      this.addUndoDelete(this.tm.getBlockByStart(blockStart))
+      this.tm.removeBlock(blockStart)
+      this.save()
     },
     /**
      * Saves the current annotation to the store
      */
     save() {
-      this.REFFile.annotations[this.currentIndex].entities = this.tm.tokenBlocks.map((block: TMTokenBlock) => block.exportAsEntity());
+      this.annotationManager.annotations[this.currentIndex].entities = this.tm.tokenBlocks.map(
+        (block: TMTokenBlock) => block.exportAsEntity(),
+      )
     },
     beforeLeave() {
-      return "Leaving this page will discard any unsaved changes.";
-    }
+      return 'Leaving this page will discard any unsaved changes.'
+    },
   },
 }
-
 </script>

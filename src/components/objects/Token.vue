@@ -2,30 +2,30 @@
     When annotations are created, they replace the tokens
     within them in token-manager.js's tokens list. -->
 <template>
-  <span 
-  v-if="token.type === 'token'"
-  :id="'t' + token.start"
-  class="token"
-  :style="{'padding': '0.25rem'}"
+  <span
+    v-if="token.type === 'token'"
+    :id="'t' + token.start"
+    class="token"
+    :style="{ padding: '0.25rem' }"
   >
-    {{ token.text == " " ? "&nbsp;" : token.text }}
+    {{ token.text == ' ' ? '&nbsp;' : token.text }}
   </span>
 </template>
 <script>
 export default {
-  name: "Token",
+  name: 'Token',
   props: {
     token: {
       type: Object,
-      required: true
-    }
-  }
+      required: true,
+    },
+  },
 }
 </script>
 <style lang="scss">
-  .token {
-    font-size: large;
-    display: inline-block;
-    line-height: 3;
-  }
+.token {
+  font-size: large;
+  display: inline-block;
+  line-height: 3;
+}
 </style>

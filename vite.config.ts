@@ -29,5 +29,8 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-  base: '/AnNER/'
+  base: '/AnNER/',
+  define: {
+    "__APP_VERSION__": JSON.stringify(process.env.npm_package_version),
+  }
 })

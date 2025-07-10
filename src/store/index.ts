@@ -1,231 +1,135 @@
-import { LocalStorage } from "quasar";
-import { REF_File } from "../components/classes/RichEntityFormat.ts";
-import { TMTokenBlock } from "../components/classes/tokenmanager.ts";
-import { LabelManager } from "../components/classes/LabelManager.ts";
-
-const niceColors = ["red-11", "blue-11", "light-green-11", "deep-orange-11", "pink-11", "light-blue-11", "lime-11", "brown-11", "purple-11", "cyan-11", "yellow-11", "grey-11", "deep-purple-11", "teal-11", "amber-11", "blue-grey-11", "indigo-11", "green-11", "orange-11"];
+import { LocalStorage } from 'quasar'
+import { AnnotationManager } from '../components/classes/AnnotationManager.ts'
+import { TMTokenBlock } from '../components/classes/tokenmanager.ts'
+import { LabelManager } from '../components/classes/LabelManager.ts'
 
 const mutations = {
   setCurrentPage(state, page) {
-    state.currentPage = page;
-  },
-  loadClasses(state, payload) {
-    if (!Array.isArray(payload)) {
-      throw new Error("loadClasses: payload must be an array");
-    }
-    let isValid = payload.reduce((acc, curr) => acc && typeof curr === "object" && "id" in curr && "name" in curr && "color" in curr, true);
-    if (!isValid) {
-      throw new Error("loadClasses: payload has invalid schema");
-    }
-    state.classes = payload;
-    state.currentClass = state.classes[0];
-    LocalStorage.set("tags", state.classes);
+    state.currentPage = page
   },
   processFile(state, payload) {
     // Clear Out Data
-    state.currentAnnotation = {};
-    state.classes = [];
-    state.currentClass = null;
-    state.undoStack = [];
+    // TODO: LIKELY DELETE THESE AS THEY MOVE TO CLASSES
+    state.classes = []
+    state.undoStack = []
 
-    let file;
-    if (state.fileName.split(".")[1] == "json") {
+    if (state.fileName.split('.')[1] == 'json') {
       // Loading a JSON file
-      payload = JSON.parse(payload)
-      file = new REF_File(payload.annotations, payload.classes);
+      state.annotationManager = AnnotationManager.fromJSON(payload)
     } else {
       // Loading a text file
-      payload = payload.replace(/(\r\n|\n|\r){2,}/gm, "\n").split("\n")
-      payload = payload.map((item) => {
-        return [
-          null,
-          item,
-          {
-            entities: []
-          }
-        ]
-      })
-      payload = {
-        annotations: payload,
-        classes: []
-      }
-      file = new REF_File(payload.annotations, payload.classes);
+      state.annotationManager = AnnotationManager.fromText(payload)
     }
 
-    state.inputSentences = file.inputSentences();
-    state.REFFile = file;
+    state.inputSentences = state.annotationManager.inputSentences
 
-    // Setup the ClassManager
-    if (file.classes && Array.isArray(file.classes)) {
-      state.labelManager = LabelManager.fromREF(state.REFFile);
+    const classesJSON: object = JSON.parse(payload)
+
+    if (classesJSON.classes && Array.isArray(classesJSON.classes)) {
+      state.labelManager = LabelManager.fromJSON(classesJSON.classes)
+    } else {
+      state.labelManager = new LabelManager()
     }
   },
-  //TODO: REPLACE COMMIT CALLS WITH THIS MUTATION
-  addClass(state, payload) {
-    // Check if the class already exists
-    const existingClass = state.classes.find((c) => c.name === payload);
 
-    // If the class already exists, return
-    if (existingClass) {
-      return;
-    }
-
-    // Add the new class
-    const lastIndex = state.classes.reduce((p, c) => (c.id > p ? c.id : p), 0);
-    const newClass = {
-      id: lastIndex + 1,
-      name: payload,
-      color: niceColors[lastIndex % niceColors.length],
-    };
-
-    // Check again to handle a race condition
-    if (!state.classes.some((c) => c.name === newClass.name)) {
-      state.classes = [...state.classes, newClass];
-
-      // If this is the first class, set it as the currentClass
-      if (state.classes.length === 1) {
-        state.currentClass = state.classes[0];
-      }
-    }
-  },
-  removeClass(state, payload) {
-    state.classes = state.classes.filter((c) => c.id != payload);
-    if (state.currentClass && state.currentClass.id === payload) {
-      state.currentClass = state.classes[0];
-    }
-  },
-  setCurrentClass(state, payload) {
-    state.currentClass = state.classes[payload];
-  },
-  addAnnotation(state, payload) {
-    state.currentAnnotation = payload;
-  },
+  // Navigation
   nextSentence(state) {
     if (state.currentIndex < state.inputSentences.length - 1) {
-      state.currentIndex += 1;
-      state.currentAnnotation = state.REFFile.annotations[state.currentIndex];
+      state.currentIndex += 1
     }
   },
   previousSentence(state) {
     if (state.currentIndex > 0) {
-      state.currentIndex -= 1;
-      state.currentAnnotation = state.REFFile.annotations[state.currentIndex];
+      state.currentIndex -= 1
     }
   },
   resetIndex(state) {
-    state.currentIndex = 0;
+    state.currentIndex = 0
   },
-
 
   // Global Undo Stack
   addUndoCreate(state, block) {
-    let newUndo = {
-      type: "remove",
+    const newUndo = {
+      type: 'remove',
       start: block.start,
     }
-    state.undoStack.push(newUndo);
-    state.undoStack.sort((a, b) => b.timestamp - a.timestamp);
+    state.undoStack.push(newUndo)
+    state.undoStack.sort((a, b) => b.timestamp - a.timestamp)
   },
   addUndoDelete(state, removedBlock: TMTokenBlock) {
-    let newUndo = {
-      type: "create",
+    const newUndo = {
+      type: 'create',
       oldBlock: removedBlock,
-    };
-    state.undoStack.push(newUndo);
-    state.undoStack.sort((a, b) => b.timestamp - a.timestamp);
+    }
+    state.undoStack.push(newUndo)
+    state.undoStack.sort((a, b) => b.timestamp - a.timestamp)
   },
   addUndoUpdate(state, oldBlock: TMTokenBlock) {
     // on action side, deletes block and adds back old block in place
     // differs from delete in that it expects no blocks to be there
-    let newUndo = {
-      type: "update",
-      oldBlock: oldBlock
-    };
-    state.undoStack.push(newUndo);
-    state.undoStack.sort((a, b) => b.timestamp - a.timestamp);
+    const newUndo = {
+      type: 'update',
+      oldBlock: oldBlock,
+    }
+    state.undoStack.push(newUndo)
+    state.undoStack.sort((a, b) => b.timestamp - a.timestamp)
   },
-  addUndoOverlapping(state, {oldBlocks, newBlockStart}) {
-    let newUndo = {
-      type: "overlapping",
+  addUndoOverlapping(state, { oldBlocks, newBlockStart }) {
+    const newUndo = {
+      type: 'overlapping',
       overlappingBlocks: oldBlocks,
       newBlockStart: newBlockStart,
     }
-    state.undoStack.push(newUndo);
-    state.undoStack.sort((a, b) => b.timestamp - a.timestamp);
+    state.undoStack.push(newUndo)
+    state.undoStack.sort((a, b) => b.timestamp - a.timestamp)
   },
   loadFile(state, file) {
-    state.fileName = file.name;
-    let fileType = file.name.split('.').pop();
-    state.lastSavedTimestamp = null;
+    state.fileName = file.name
+    const fileType = file.name.split('.').pop()
+    state.lastSavedTimestamp = null
     try {
-      let reader = new FileReader();
-      reader.readAsText(file);
-      reader.addEventListener("load", (event) => {
-        mutations.processFile(state, event.target.result);
+      const reader = new FileReader()
+      reader.readAsText(file)
+      reader.addEventListener('load', (event) => {
+        mutations.processFile(state, event.target.result)
 
-        if (fileType === "txt") {
-          mutations.setCurrentPage(state, 'annotate');
-        }
-        else if (fileType === "json") {
-          mutations.setCurrentPage(state, 'review');
-        }
-        else {
+        if (fileType === 'txt') {
+          mutations.setCurrentPage(state, 'annotate')
+        } else if (fileType === 'json') {
+          mutations.setCurrentPage(state, 'review')
+        } else {
           this.$q.dialog({
             title: 'Incompatible File Type',
-            message: 'Please upload either a .txt or a .json file.'
+            message: 'Please upload either a .txt or a .json file.',
           })
           mutations.setCurrentPage(state, 'start')
         }
-      });
+      })
     } catch (e) {
       this.$q.notify({
-        icon: "fas fa-exclamation-circle",
-        message: "Invalid file",
-        color: "red-6",
-        position: "top",
+        icon: 'fas fa-exclamation-circle',
+        message: 'Invalid file',
+        color: 'red-6',
+        position: 'top',
         timeout: 2000,
-        actions: [{label: "Dismiss", color: "white"}],
-      });
+        actions: [{ label: 'Dismiss', color: 'white' }],
+      })
     }
-  }
-};
-
-const actions = {
-  createNewClass({ commit, state }, className) {
-    return new Promise((resolve, reject) => {
-      commit("addClass", className);
-      try {
-        LocalStorage.set("tags", state.classes);
-      } catch (e) {
-        reject(e);
-      }
-      resolve();
-    });
   },
-  deleteClass({ commit, state }, classId) {
-    commit("removeClass", classId);
-    LocalStorage.set("tags", state.classes);
-  },
-};
+}
 
 export default {
   state() {
-    let tags = LocalStorage.getItem("tags");
     return {
-      classes: tags || [],
-      currentAnnotation: {},
-      currentClass: (tags && tags[0]) || {},
       currentIndex: 0,
-      currentPage: "start",
-      currentSentence: "",
+      currentPage: 'start',
       fileName: null,
       inputSentences: [],
       lastSavedTimestamp: null,
       undoStack: [],
-      REFFile: null,
-      labelManager: null, // Placeholder for LabelManager instance
-    };
+      annotationManager: null, // Global annotation manager
+      labelManager: null, // Global label manager
+    }
   },
   mutations,
-  actions,
-};
+}
