@@ -1,5 +1,5 @@
 import { AnnotationManager } from '../components/classes/AnnotationManager.ts'
-import { TMTokenBlock } from '../components/classes/tokenmanager.ts'
+import { TMTokenBlock } from '../components/classes/TokenManager.ts'
 import { LabelManager } from '../components/classes/LabelManager.ts'
 
 const mutations = {
