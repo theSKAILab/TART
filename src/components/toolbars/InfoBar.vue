@@ -2,10 +2,16 @@
   <div class="q-pa-md" style="">
     <div style="display: inline-block">
       <span class="q-pl-md"
-        >{{ getWordCount(this.inputSentences[this.currentIndex].text) }} Words</span
+        >{{
+          getWordCount(this.annotationManager.inputSentences[this.currentIndex].text)
+        }}
+        Words</span
       >
       <span class="q-pl-md"
-        >{{ getCharCount(this.inputSentences[this.currentIndex].text) }} Characters</span
+        >{{
+          getCharCount(this.annotationManager.inputSentences[this.currentIndex].text)
+        }}
+        Characters</span
       >
       <span class="q-pl-md"
         >Paragraph {{ this.currentIndex + 1 }}/{{ this.annotationManager.annotations.length }}</span
@@ -32,7 +38,7 @@
       outline
       title="Go forward one sentence/paragraph"
       @click="next"
-      :disabled="currentIndex == this.inputSentences.length - 1"
+      :disabled="currentIndex == this.annotationManager.inputSentences.length - 1"
       label="Next"
       style="position: absolute; right: 16px; bottom: 17px"
     />
@@ -45,7 +51,7 @@ import { mapState, mapMutations } from 'vuex'
 export default {
   name: 'InfoBar',
   computed: {
-    ...mapState(['currentIndex', 'inputSentences', 'annotationManager']),
+    ...mapState(['currentIndex', 'annotationManager']),
   },
   methods: {
     ...mapMutations(['setCurrentIndex', 'setCurrentPage', 'nextSentence', 'previousSentence']),

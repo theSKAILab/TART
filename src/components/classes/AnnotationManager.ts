@@ -33,7 +33,6 @@ import { Label } from './LabelManager'
 /**
  * Represents the Rich Entity Format File
  * @param {Paragraph[]} annotations - Array of paragraphs with annotations.
- * @param {LabelClass[]} classes - Array of label classes.
  */
 export class AnnotationManager {
   public annotations: Paragraph[] // Array of paragraphs with annotations
@@ -46,19 +45,8 @@ export class AnnotationManager {
     this.annotations = annotations.map((paragraph) => Paragraph.fromJSON(paragraph)) // Convert each paragraph to a Paragraph instance
   }
 
-  public toJSON(): object {
-    return this.annotations.map((paragraph) => paragraph.toJSON()) // Convert each paragraph to JSON
-  }
-
-  public static formatDate(date: Date): string {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0') // Months are zero-indexed
-    const day = String(date.getDate()).padStart(2, '0')
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    const seconds = String(date.getSeconds()).padStart(2, '0')
-
-    return `${year}-${month}-${day}~${hours}:${minutes}:${seconds}`
+  public toJSON(newAnnotator: string): object {
+    return this.annotations.map((paragraph) => paragraph.toJSON(newAnnotator)) // Convert each paragraph to JSON
   }
 
   public static fromText(text: string): AnnotationManager {
@@ -91,12 +79,12 @@ export class Paragraph {
   public entities: Entity[]
 
   // Export JSON format for the Paragraph class
-  private get JSONFormat(): object {
+  private JSONFormat(newAnnotator: string): object {
     return [
       null, // Placeholder for the paragraph ID, can be set later
       this.text, // The text of the paragraph
       {
-        entities: this.entities.map((entity) => entity.toJSON()), // Convert each entity to JSON
+        entities: this.entities.map((entity) => entity.toJSON(newAnnotator)), // Convert each entity to JSON
       },
     ]
   }
@@ -113,8 +101,8 @@ export class Paragraph {
    * Converts the Paragraph instance to a JSON object.
    * @returns {object} The JSON representation of the Paragraph.
    */
-  public toJSON(): object {
-    return this.JSONFormat
+  public toJSON(newAnnotator: string): object {
+    return this.JSONFormat(newAnnotator)
   }
 
   /**
@@ -139,8 +127,9 @@ export class Entity {
   public currentState: string | undefined // Current state of the entity, e.g., "active", "inactive"
   public name: string | undefined // Name of last annotator
   public labelName: string | undefined // Name of the label assigned to the entity
-  public labelClass: LabelClass | Label | undefined // Label class of the entity
+  public labelClass: Label | undefined // Label class of the entity
   public history: History[] // Array to hold the history of label changes
+  public reviewed: boolean // Indicates if the entity has been reviewed
 
   public latestEntry = () => {
     return this.history.length > 0 ? this.history[this.history.length - 1] : null // Get the latest history entry
@@ -161,10 +150,12 @@ export class Entity {
     start: number,
     end: number,
     history: object[] | History[] = [],
-    labelClass: LabelClass | undefined = undefined,
+    labelClass: Label | undefined = undefined,
+    reviewed: boolean = false, // Indicates if the entity has been reviewed
   ) {
     this.start = start // Start index of the entity
     this.end = end // End index of the entity
+    this.reviewed = reviewed // Set the reviewed status of the entity
 
     if (history[0] instanceof History) {
       this.history = history
@@ -183,7 +174,8 @@ export class Entity {
    * Converts the Entity instance to a JSON object.
    * @returns {JSON} The JSON representation of the Entity.
    */
-  public toJSON(): object {
+  public toJSON(newAnnotator: string): object {
+    this.generateHistoryEntryForExport(newAnnotator) // Generate history entry for export
     return this.JSONFormat
   }
 
@@ -209,6 +201,40 @@ export class Entity {
       this.name = '' // Default name if no history is present
     }
   }
+
+  private generateHistoryEntryForExport(newAnnotator: string): void {
+    const newHistoryEntry = new History(
+      this.labelName || '', // Use the label name or an empty string if not set
+      this.currentState || 'Candidate', // Use the current state or default to 'Candidate'
+      newAnnotator, // The name of the annotator making the change
+      History.formatDate(new Date()), // Current timestamp
+    )
+    if (
+      this.reviewed &&
+      this.latestEntry()?.annotatorName != newAnnotator &&
+      this.latestEntry()?.state == this.currentState &&
+      this.latestEntry()?.label == this.labelName
+    ) {
+      this.history.push(
+        new History(
+          this.latestEntry()?.label,
+          this.latestEntry()?.state,
+          newAnnotator,
+          History.formatDate(new Date()),
+        ), //  Current reviewer "concurs" with previous reviewer and is not the same as previous reviewer
+      )
+    } else if (
+      (this.currentState == 'Candidate' || this.currentState == 'Suggested') &&
+      this.history.length == 0
+    ) {
+      this.history.push(newHistoryEntry) // If the entity is in 'Candidate' or 'Suggested' state and has no history, add the new history entry
+    } else if (
+      this.latestEntry()?.state != this.currentState ||
+      this.latestEntry()?.label != this.labelName
+    ) {
+      this.history.push(newHistoryEntry) // If the current state or label has changed, add the new history entry
+    }
+  }
 }
 
 /**
@@ -221,7 +247,7 @@ export class History {
   public label: string // The label of the entity at this point in history
   public state: string // The state of the entity at this point in history
   public annotatorName: string // The name of the annotator who made this change
-  public timestamp: Date | null // The timestamp when this change was made
+  public timestamp: string | null // The timestamp when this change was made
 
   // Export JSON format for the History class
   private get ArrayFormat(): object {
@@ -233,7 +259,12 @@ export class History {
     ]
   }
 
-  constructor(label: string, state: string, annotatorName: string, timestamp: Date | null = null) {
+  constructor(
+    label: string,
+    state: string,
+    annotatorName: string,
+    timestamp: string | null = null,
+  ) {
     this.label = label
     this.state = state
     this.annotatorName = annotatorName
@@ -255,5 +286,17 @@ export class History {
    */
   public static fromJSON(json: any): History {
     return new History(json[0], json[1], json[3], json[2])
+  }
+
+  public static formatDate(date: Date): string {
+    console.log(date)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0') // Months are zero-indexed
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    const seconds = String(date.getSeconds()).padStart(2, '0')
+
+    return `${year}-${month}-${day}~${hours}:${minutes}:${seconds}`
   }
 }

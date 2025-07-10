@@ -65,6 +65,7 @@ export class TMTokenBlock implements TMTokens {
       this.end, // End index of the entity
       this.history,
       this.labelClass,
+      this.reviewed, // Indicates if the entity has been reviewed
     )
   }
 }
@@ -73,7 +74,7 @@ export class TokenManager {
   public labelManager: LabelManager
   public tokens: TMTokens[] // Array of TMToken or TMTokenBlock objects
   public get tokenBlocks(): TMTokenBlock[] {
-    return this.tokens.filter((token: TMTokens) => token.type == 'token-block') as TMTokenBlock[]
+    return this.tokens.filter((token: TMTokens) => token instanceof TMTokenBlock) as TMTokenBlock[]
   }
 
   constructor(

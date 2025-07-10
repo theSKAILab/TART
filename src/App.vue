@@ -16,9 +16,18 @@
           <review-page v-if="currentPage === 'review'" />
         </q-page-container>
       </q-layout>
-      <drag-n-drop-overlay
+      <!-- Drag/Drop Overlay -->
+      <div
+        class="fullscreen column justify-center bg-black"
         :style="{ visibility: overlayActive && pendingFileDrop == null ? 'visible' : 'hidden' }"
-      />
+      >
+        <div class="column items-center">
+          <p class="text-h2 text-white">
+            <q-icon name="fas fa-upload" />
+          </p>
+          <p class="text-h3 text-white">Drop file to upload.</p>
+        </div>
+      </div>
       <exit-dialog
         :show="pendingFileDrop != null && currentPage != 'start'"
         @hide="pendingFileDrop = null"
@@ -33,7 +42,6 @@ import MenuBar from './components/toolbars/MenuBar.vue'
 import StartPage from './components/pages/StartPage.vue'
 import AnnotationPage from './components/pages/AnnotationPage.vue'
 import ReviewPage from './components/pages/ReviewPage.vue'
-import DragNDropOverlay from './components/etc/DragNDropOverlay.vue'
 import { mapState, mapMutations } from 'vuex'
 import { useQuasar } from 'quasar'
 
@@ -70,7 +78,6 @@ export default {
     StartPage,
     AnnotationPage,
     ReviewPage,
-    DragNDropOverlay,
   },
   computed: {
     ...mapState(['classes', 'currentPage']),

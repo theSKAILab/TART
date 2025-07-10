@@ -83,7 +83,7 @@
 <script lang="ts">
 import { mapState } from 'vuex'
 export default {
-  name: 'ClassesBlock',
+  name: 'LabelsBlock',
   data() {
     return {
       newClassName: '',

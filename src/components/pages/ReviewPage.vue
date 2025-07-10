@@ -1,6 +1,6 @@
 <template>
   <div>
-    <classes-block />
+    <labels-block />
     <div class="q-pa-lg" style="height: calc(100vh - 190px); overflow-y: scroll">
       <component
         v-for="t in eligibleTokens"
@@ -20,9 +20,9 @@
 </template>
 <script>
 import { mapState, mapMutations } from 'vuex'
-import Token from '../objects/Token'
-import TokenBlock from '../objects/TokenBlock'
-import ClassesBlock from '../objects/ClassesBlock.vue'
+import Token from '../blocks/Token'
+import TokenBlock from '../blocks/TokenBlock'
+import LabelsBlock from '../blocks/LabelsBlock.vue'
 import InfoBar from '../toolbars/InfoBar.vue'
 import SharedEditorFunctions from './shared.vue'
 
@@ -31,11 +31,11 @@ export default {
   components: {
     Token,
     TokenBlock,
-    ClassesBlock,
+    LabelsBlock,
     InfoBar,
   },
   computed: {
-    ...mapState(['inputSentences', 'annotations']),
+    ...mapState(['annotations']),
     // TODO: THIS SHOULD BE REWRITTEN BETTER
     eligibleTokens() {
       const renderedList = []
@@ -59,7 +59,7 @@ export default {
   },
   created() {
     // Add blocks for all paragraphs
-    if (this.inputSentences.length) {
+    if (this.annotationManager.inputSentences.length) {
       this.tokenizeCurrentSentence()
     }
     document.addEventListener('mouseup', this.selectTokens)

@@ -1,4 +1,3 @@
-import { LocalStorage } from 'quasar'
 import { AnnotationManager } from '../components/classes/AnnotationManager.ts'
 import { TMTokenBlock } from '../components/classes/tokenmanager.ts'
 import { LabelManager } from '../components/classes/LabelManager.ts'
@@ -10,7 +9,6 @@ const mutations = {
   processFile(state, payload) {
     // Clear Out Data
     // TODO: LIKELY DELETE THESE AS THEY MOVE TO CLASSES
-    state.classes = []
     state.undoStack = []
 
     if (state.fileName.split('.')[1] == 'json') {
@@ -20,8 +18,6 @@ const mutations = {
       // Loading a text file
       state.annotationManager = AnnotationManager.fromText(payload)
     }
-
-    state.inputSentences = state.annotationManager.inputSentences
 
     const classesJSON: object = JSON.parse(payload)
 
@@ -34,7 +30,7 @@ const mutations = {
 
   // Navigation
   nextSentence(state) {
-    if (state.currentIndex < state.inputSentences.length - 1) {
+    if (state.currentIndex < state.annotationManager.inputSentences.length - 1) {
       state.currentIndex += 1
     }
   },
@@ -86,7 +82,6 @@ const mutations = {
   loadFile(state, file) {
     state.fileName = file.name
     const fileType = file.name.split('.').pop()
-    state.lastSavedTimestamp = null
     try {
       const reader = new FileReader()
       reader.readAsText(file)
@@ -124,8 +119,6 @@ export default {
       currentIndex: 0,
       currentPage: 'start',
       fileName: null,
-      inputSentences: [],
-      lastSavedTimestamp: null,
       undoStack: [],
       annotationManager: null, // Global annotation manager
       labelManager: null, // Global label manager

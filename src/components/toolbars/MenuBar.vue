@@ -190,8 +190,6 @@
 </template>
 
 <script lang="ts">
-import { Exporter } from '../classes/IOManager'
-import ExportAnnotations from '../etc/ExportAnnotations.vue'
 import { mapState, mapMutations } from 'vuex'
 import AboutDialog from '../dialogs/AboutDialog.vue'
 import ExitDialog from '../dialogs/ExitDialog.vue'
@@ -231,7 +229,6 @@ export default {
       return this.$store.state.fileName ? this.$store.state.fileName + ' - ' : ''
     },
   },
-  mixins: [ExportAnnotations],
   methods: {
     ...mapMutations(['setCurrentPage', 'loadFile']),
     toggleDarkMode: function () {
@@ -288,7 +285,7 @@ export default {
     export() {
       this.$q
         .dialog({
-          title: 'Save File 2',
+          title: 'Save File',
           message: 'Please enter a name for the exported annotations file',
           prompt: {
             model: '',
@@ -299,10 +296,11 @@ export default {
           persistent: true,
         })
         .onOk((currentAnnotator: string) => {
-          const outputJSON: string = Exporter.exportToJSON(
-            this.annotationManager,
-            this.labelManager,
-          )
+          const outputObject: object = {
+            classes: this.labelManager.toJSON(),
+            annotations: this.annotationManager.toJSON(currentAnnotator),
+          }
+          const outputJSON: string = JSON.stringify(outputObject, null, 2)
           const element = document.createElement('a')
           element.setAttribute(
             'href',
