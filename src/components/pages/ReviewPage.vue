@@ -19,7 +19,7 @@
   </div>
 </template>
 <script>
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'vuex'
 import Token from '../blocks/Token'
 import TokenBlock from '../blocks/TokenBlock'
 import LabelsBlock from '../blocks/LabelsBlock.vue'
@@ -39,9 +39,9 @@ export default {
     // TODO: THIS SHOULD BE REWRITTEN BETTER
     eligibleTokens() {
       const renderedList = []
-      for (let i = 0; i < this.tm.tokens.length; i++) {
-        const t = this.tm.tokens[i]
-        const tokenOverlapping = this.tm.isOverlapping(t.start, t.end)
+      for (let i = 0; i < this.tokenManager.tokens.length; i++) {
+        const t = this.tokenManager.tokens[i]
+        const tokenOverlapping = this.tokenManager.isOverlapping(t.start, t.end)
         if (!tokenOverlapping) {
           renderedList.push(t)
         } else if (
@@ -66,21 +66,14 @@ export default {
     window.onbeforeunload = this.beforeLeave
 
     // Emits
-    this.emitter.on('undo', this.undo)
-    this.emitter.on('undoAll', this.undoAll)
     this.emitter.on('tokenizeCurrentSentence', this.tokenizeCurrentSentence)
   },
   beforeUnmount() {
     document.removeEventListener('mouseup', this.selectTokens)
 
     // Remove emits
-    this.emitter.off('undo', this.undo)
-    this.emitter.off('undoAll', this.undoAll)
     this.emitter.off('tokenizeCurrentSentence', this.tokenizeCurrentSentence)
   },
   mixins: [SharedEditorFunctions],
-  methods: {
-    ...mapMutations(['resetIndex']),
-  },
 }
 </script>

@@ -1,84 +1,9 @@
 import { AnnotationManager } from '../components/classes/AnnotationManager.ts'
-import { TMTokenBlock } from '../components/classes/TokenManager.ts'
 import { LabelManager } from '../components/classes/LabelManager.ts'
+import { UndoManager } from '@/components/classes/UndoManager.ts'
 
 const mutations = {
-  setCurrentPage(state, page) {
-    state.currentPage = page
-  },
-  processFile(state, payload) {
-    // Clear Out Data
-    // TODO: LIKELY DELETE THESE AS THEY MOVE TO CLASSES
-    state.undoStack = []
-
-    if (state.fileName.split('.')[1] == 'json') {
-      // Loading a JSON file
-      state.annotationManager = AnnotationManager.fromJSON(payload)
-    } else {
-      // Loading a text file
-      state.annotationManager = AnnotationManager.fromText(payload)
-    }
-
-    const classesJSON: object = JSON.parse(payload)
-
-    if (classesJSON.classes && Array.isArray(classesJSON.classes)) {
-      state.labelManager = LabelManager.fromJSON(classesJSON.classes)
-    } else {
-      state.labelManager = new LabelManager()
-    }
-  },
-
-  // Navigation
-  nextSentence(state) {
-    if (state.currentIndex < state.annotationManager.inputSentences.length - 1) {
-      state.currentIndex += 1
-    }
-  },
-  previousSentence(state) {
-    if (state.currentIndex > 0) {
-      state.currentIndex -= 1
-    }
-  },
-  resetIndex(state) {
-    state.currentIndex = 0
-  },
-
-  // Global Undo Stack
-  addUndoCreate(state, block) {
-    const newUndo = {
-      type: 'remove',
-      start: block.start,
-    }
-    state.undoStack.push(newUndo)
-    state.undoStack.sort((a, b) => b.timestamp - a.timestamp)
-  },
-  addUndoDelete(state, removedBlock: TMTokenBlock) {
-    const newUndo = {
-      type: 'create',
-      oldBlock: removedBlock,
-    }
-    state.undoStack.push(newUndo)
-    state.undoStack.sort((a, b) => b.timestamp - a.timestamp)
-  },
-  addUndoUpdate(state, oldBlock: TMTokenBlock) {
-    // on action side, deletes block and adds back old block in place
-    // differs from delete in that it expects no blocks to be there
-    const newUndo = {
-      type: 'update',
-      oldBlock: oldBlock,
-    }
-    state.undoStack.push(newUndo)
-    state.undoStack.sort((a, b) => b.timestamp - a.timestamp)
-  },
-  addUndoOverlapping(state, { oldBlocks, newBlockStart }) {
-    const newUndo = {
-      type: 'overlapping',
-      overlappingBlocks: oldBlocks,
-      newBlockStart: newBlockStart,
-    }
-    state.undoStack.push(newUndo)
-    state.undoStack.sort((a, b) => b.timestamp - a.timestamp)
-  },
+  // File Loading
   loadFile(state, file) {
     state.fileName = file.name
     const fileType = file.name.split('.').pop()
@@ -111,6 +36,39 @@ const mutations = {
       })
     }
   },
+  processFile(state, payload) {
+    if (state.fileName.split('.')[1] == 'json') {
+      // Loading a JSON file
+      state.annotationManager = AnnotationManager.fromJSON(payload)
+      const classesJSON: object = JSON.parse(payload)
+      state.labelManager = LabelManager.fromJSON(classesJSON.classes)
+    } else {
+      // Loading a text file
+      state.annotationManager = AnnotationManager.fromText(payload)
+      state.labelManager = new LabelManager()
+    }
+  },
+
+  // Navigation
+  nextSentence(state) {
+    if (state.currentIndex < state.annotationManager.inputSentences.length - 1) {
+      state.currentIndex += 1
+    }
+  },
+  previousSentence(state) {
+    if (state.currentIndex > 0) {
+      state.currentIndex -= 1
+    }
+  },
+  setCurrentPage(state, page) {
+    state.currentPage = page
+  },
+
+  // Global Setters
+  setTokenManager(state, tokenManager) {
+    state.tokenManager = tokenManager
+    state.undoManager = new UndoManager(state.tokenManager)
+  },
 }
 
 export default {
@@ -119,9 +77,10 @@ export default {
       currentIndex: 0,
       currentPage: 'start',
       fileName: null,
-      undoStack: [],
       annotationManager: null, // Global annotation manager
-      labelManager: null, // Global label manager
+      labelManager: null, // Global label manager,
+      tokenManager: null, // Global token manager,
+      undoManager: null, // Global undo manager
     }
   },
   mutations,

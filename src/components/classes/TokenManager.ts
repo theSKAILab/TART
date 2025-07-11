@@ -73,6 +73,7 @@ export class TMTokenBlock implements TMTokens {
 export class TokenManager {
   public labelManager: LabelManager
   public tokens: TMTokens[] // Array of TMToken or TMTokenBlock objects
+  public edited: number = 0 // Counter for edits
   public get tokenBlocks(): TMTokenBlock[] {
     return this.tokens.filter((token: TMTokens) => token instanceof TMTokenBlock) as TMTokenBlock[]
   }
@@ -84,7 +85,7 @@ export class TokenManager {
   ) {
     this.labelManager = labelManager
     this.tokens = tokens.map((t: object) => TMToken.fromObject(t))
-
+    this.edited = 0
     if (currentParagraph) {
       // Reset previous annotation state
       currentParagraph.entities.forEach((entity: Entity) => {
@@ -174,6 +175,7 @@ export class TokenManager {
     // Update the tokens array with new tokens
     newTokens.sort((a, b) => a.start - b.start)
     this.tokens = newTokens
+    this.edited++
   }
 
   public addBlockFromStructure(entity: Entity | TMTokenBlock): void {
@@ -185,6 +187,7 @@ export class TokenManager {
       entity.history || [],
       'annotate', // Default run mode
     )
+    this.edited++
   }
 
   public removeBlock(start: number, reintroduceTokens: boolean = true): void {
@@ -200,13 +203,15 @@ export class TokenManager {
       }
     }
     this.tokens = newTokens
+    this.edited++
   }
 
   public removeDuplicateBlocks(): void {
     this.tokens = [...new Set(this.tokens.sort((a, b) => a.start - b.start))]
+    this.edited++
   }
 
-  public getBlockByStart(start: number): TMTokens | null {
+  public getBlockByStart(start: number): TMToken | null {
     for (let i = 0; i < this.tokens.length; i++) {
       const token: TMTokens = this.tokens[i]
       if (token.type === 'token-block' && token.start === start) {

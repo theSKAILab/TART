@@ -69,7 +69,7 @@
               <q-item
                 clickable
                 v-close-popup
-                @click="this.emitter.emit('undo')"
+                @click="undoManager.undo(tokenManager)"
                 :class="$store.state.currentPage == 'start' ? 'disabled' : ''"
               >
                 <q-item-section>
@@ -80,7 +80,7 @@
               <q-item
                 clickable
                 v-close-popup
-                @click="this.emitter.emit('undoAll')"
+                @click="undoManager.undoAll(tokenManager)"
                 :class="$store.state.currentPage == 'start' ? 'disabled' : ''"
               >
                 <q-item-section>
@@ -195,10 +195,6 @@ import AboutDialog from '../dialogs/AboutDialog.vue'
 import ExitDialog from '../dialogs/ExitDialog.vue'
 import OpenDialog from '../dialogs/OpenDialog.vue'
 
-import { save } from '@tauri-apps/plugin-dialog'
-import { invoke } from '@tauri-apps/api/core'
-import { documentDir } from '@tauri-apps/api/path'
-
 export default {
   components: { AboutDialog, ExitDialog, OpenDialog },
   name: 'MenuBar',
@@ -212,7 +208,7 @@ export default {
     }
   },
   created() {
-    document.addEventListener('keydown', this.menuKeyBind)
+    document.addEventListener('keyup', this.menuKeyBind)
     window.addEventListener('beforeinstallprompt', (e) => {
       this.installablePWA = true
       // Stash the event so it can be triggered later.
@@ -224,7 +220,14 @@ export default {
     })
   },
   computed: {
-    ...mapState(['fileName', 'currentPage', 'annotationManager', 'labelManager']),
+    ...mapState([
+      'fileName',
+      'currentPage',
+      'annotationManager',
+      'labelManager',
+      'undoManager',
+      'tokenManager',
+    ]),
     titleBar() {
       return this.$store.state.fileName ? this.$store.state.fileName + ' - ' : ''
     },
@@ -264,11 +267,10 @@ export default {
 
       // Edit Menu Binds
       if (e.key == 'z' && e.ctrlKey && isValid) {
-        this.emitter.emit('undo')
+        this.undoManager.undo(this.tokenManager)
       }
       if (e.key == 'z' && e.altKey && isValid) {
-        console.log('Fire')
-        this.emitter.emit('undoAll')
+        this.undoManager.undoAll(this.tokenManager)
       }
 
       // Annotator Menu Binds

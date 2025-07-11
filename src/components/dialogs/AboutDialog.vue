@@ -41,7 +41,9 @@
           <br />This tool was designed and developed in the Spatial Knowledge and Artificial
           Intelligence (SKAI) lab at University of Maine<br /><br />
           <span style="font-weight: bold">Cite this tool as:</span><br />
-          Author 1, Author 2, Author 3, & Author 4. ({{ new Date().getFullYear() }}).
+          Umayer Reza, Nicholas Pease, Torsten Hahmann, and Jinwu Wang. ({{
+            new Date().getFullYear()
+          }}).
           <span style="font-style: italic">Annotation and Named Entity Review Tool (AnNER)</span>
           [Computer software].
         </q-card-section>

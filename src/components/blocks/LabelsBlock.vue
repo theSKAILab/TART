@@ -5,7 +5,7 @@
     <div class="row">
       <div class="tags">
         <q-chip
-          v-for="(label, index) in this.allLabels"
+          v-for="label in this.allLabels"
           :key="label.id"
           outline
           square
@@ -29,8 +29,7 @@
             style="height: 2rem"
             text-color="white"
             font-size="16px"
-            >{{ index + 1 }}</q-avatar
-          >
+          ></q-avatar>
           <p :class="['q-mb-none', $q.dark.isActive ? 'text-grey-3' : 'text-grey-9']">
             {{ label.name }}
           </p>
@@ -115,7 +114,6 @@ export default {
     saveLabel() {
       if (!this.newClassName) return
       this.labelManager.addLabel(this.newClassName)
-      self.newClassName = ''
     },
   },
 }

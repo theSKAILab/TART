@@ -6,15 +6,23 @@ import { TokenManager, TMTokenBlock } from '../classes/TokenManager'
 export default {
   name: 'SharedEditorFunctions',
   computed: {
-    ...mapState(['currentPage', 'currentIndex', 'undoStack', 'labelManager', 'annotationManager']),
-  },
-  data() {
-    return {
-      tm: null,
-    }
+    ...mapState([
+      'currentPage',
+      'currentIndex',
+      'labelManager',
+      'annotationManager',
+      'tokenManager',
+      'undoManager',
+    ]),
+    tmEdited() {
+      if (this.tokenManager) {
+        return this.tokenManager.edited
+      }
+      return []
+    },
   },
   watch: {
-    tm: {
+    tmEdited: {
       handler() {
         this.save()
       },
@@ -25,63 +33,21 @@ export default {
     ...mapMutations([
       'nextSentence',
       'previousSentence',
-      'resetIndex',
       'addUndoCreate',
       'addUndoDelete',
       'addUndoOverlapping',
+      'setTokenManager',
     ]),
-    undo() {
-      if (this.undoStack.length > 0) {
-        const lastAction = this.undoStack.pop()
-        console.log('Undoing action:', lastAction)
-        switch (lastAction.type) {
-          case 'remove':
-            this.tm.removeBlock(lastAction.start)
-            break
-          case 'create':
-            this.tm.addBlockFromStructure(lastAction.oldBlock)
-            break
-          case 'update':
-            this.tm.addBlockFromStructure(lastAction.oldBlock)
-            break
-          case 'overlapping':
-            // Gross fix
-            // Basically remove all of the mentioned blocks and add them back with their previous state
-            for (let i = 0; i < lastAction.overlappingBlocks.length; i++) {
-              this.tm.removeBlock(lastAction.overlappingBlocks[i].start)
-            }
-            this.tm.removeBlock(lastAction.newBlockStart, true)
-            // Add the old blocks back
-            this.tm.removeDuplicateBlocks()
-            for (i = 0; i < lastAction.overlappingBlocks.length; i++) {
-              this.tm.addNewBlock(
-                lastAction.overlappingBlocks[i].start,
-                lastAction.overlappingBlocks[i].end,
-                lastAction.overlappingBlocks[i].labelClass,
-                lastAction.overlappingBlocks[i].previousState,
-                [],
-                this.currentPage,
-              )
-            }
-            break
-        }
-        this.save()
-      }
-    },
-    undoAll() {
-      while (this.undoStack.length > 0) {
-        this.undo()
-      }
-      this.save()
-    },
     /**
      * Tokenizes the current sentence and sets the TokenManager
      */
     tokenizeCurrentSentence() {
-      this.tm = new TokenManager(
-        this.labelManager,
-        Tokenizer.span_tokenize(this.annotationManager.inputSentences[this.currentIndex].text),
-        this.annotationManager.annotations[this.currentIndex],
+      this.setTokenManager(
+        new TokenManager(
+          this.labelManager,
+          Tokenizer.span_tokenize(this.annotationManager.inputSentences[this.currentIndex].text),
+          this.annotationManager.annotations[this.currentIndex],
+        ),
       )
     },
     /**
@@ -121,7 +87,7 @@ export default {
       // Attempt to create a new block
 
       // Determine if the selection will overlap with an existing block and add to undo stack accordingly
-      const existingBlocks = this.tm.isOverlapping(start, end)
+      const existingBlocks = this.tokenManager.isOverlapping(start, end)
       if (existingBlocks) {
         // Prompt to user to confirm overlapping blocks
         this.$q
@@ -133,8 +99,8 @@ export default {
             persistent: true,
           })
           .onOk(() => {
-            this.addUndoOverlapping({ oldBlocks: existingBlocks, newBlockStart: start })
-            this.tm.addNewBlock(
+            this.undoManager.addOverlappingUndo(existingBlocks, start)
+            this.tokenManager.addNewBlock(
               start,
               end,
               this.labelManager.currentLabel,
@@ -144,7 +110,7 @@ export default {
             )
           })
       } else {
-        this.tm.addNewBlock(
+        this.tokenManager.addNewBlock(
           start,
           end,
           this.labelManager.currentLabel,
@@ -152,7 +118,7 @@ export default {
           [],
           this.currentPage,
         )
-        if (this.tm.getBlockByStart(start)) this.addUndoCreate(this.tm.getBlockByStart(start))
+        if (this.tokenManager.getBlockByStart(start)) this.undoManager.addCreateUndo(start)
       }
 
       selection.empty()
@@ -164,17 +130,16 @@ export default {
      * @param {Number} blockStart - The start position of the block to remove
      */
     onRemoveBlock(blockStart: number) {
-      this.addUndoDelete(this.tm.getBlockByStart(blockStart))
-      this.tm.removeBlock(blockStart)
+      this.undoManager.addDeleteUndo(this.tokenManager.getBlockByStart(blockStart))
+      this.tokenManager.removeBlock(blockStart)
       this.save()
     },
     /**
      * Saves the current annotation to the store
      */
     save() {
-      this.annotationManager.annotations[this.currentIndex].entities = this.tm.tokenBlocks.map(
-        (block: TMTokenBlock) => block.exportAsEntity(),
-      )
+      this.annotationManager.annotations[this.currentIndex].entities =
+        this.tokenManager.tokenBlocks.map((block: TMTokenBlock) => block.exportAsEntity())
     },
     beforeLeave() {
       return 'Leaving this page will discard any unsaved changes.'

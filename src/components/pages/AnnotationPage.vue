@@ -4,7 +4,7 @@
     <div class="q-pa-lg" style="height: calc(100vh - 190px); overflow-y: scroll">
       <component
         :is="t.type === 'token' ? 'Token' : 'TokenBlock'"
-        v-for="t in tm.tokens"
+        v-for="t in this.tokenManager.tokens"
         :key="`${t.type}-${t.start}`"
         :token="t"
         :class="[t.reviewed ? 'user-active' : 'user-inactive']"
@@ -19,7 +19,7 @@
   </div>
 </template>
 <script>
-import { mapState, mapMutations } from 'vuex'
+import { mapState } from 'vuex'
 import Token from '../blocks/Token'
 import TokenBlock from '../blocks/TokenBlock'
 import LabelsBlock from '../blocks/LabelsBlock.vue'
@@ -35,7 +35,7 @@ export default {
     InfoBar,
   },
   computed: {
-    ...mapState(['currentIndex', 'undoStack']),
+    ...mapState(['currentIndex']),
   },
   created() {
     // Add blocks for all paragraphs
@@ -46,21 +46,14 @@ export default {
     window.onbeforeunload = this.beforeLeave
 
     // Emits
-    this.emitter.on('undo', this.undo)
-    this.emitter.on('undoAll', this.undoAll)
     this.emitter.on('tokenizeCurrentSentence', this.tokenizeCurrentSentence)
   },
   beforeUnmount() {
     document.removeEventListener('mouseup', this.selectTokens)
 
     // Remove emits
-    this.emitter.off('undo', this.undo)
-    this.emitter.off('undoAll', this.undoAll)
     this.emitter.off('tokenizeCurrentSentence', this.tokenizeCurrentSentence)
   },
   mixins: [SharedEditorFunctions],
-  methods: {
-    ...mapMutations(['resetIndex']),
-  },
 }
 </script>

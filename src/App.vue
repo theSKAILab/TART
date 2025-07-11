@@ -83,13 +83,7 @@ export default {
     ...mapState(['classes', 'currentPage']),
   },
   methods: {
-    ...mapMutations([
-      'loadAnnotations',
-      'setInputSentences',
-      'resetIndex',
-      'setCurrentPage',
-      'loadFile',
-    ]),
+    ...mapMutations(['setCurrentPage', 'loadFile']),
     onDragEnter() {
       if (this.currentPage == 'start') this.overlayActive = true
     },

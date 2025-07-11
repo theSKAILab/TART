@@ -60,6 +60,9 @@ export class LabelManager {
 
   public addLabel(name: string) {
     this.labels.push(new Label(this.labels.length + 1, name, this.generateRandomColor()))
+    if (this.labels.length === 1) {
+      this.currentLabel = this.labels[0] // Set the first label as current if it's the first one added
+    }
   }
 
   public deleteLabel(name: string) {

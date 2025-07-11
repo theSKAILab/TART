@@ -48,7 +48,7 @@
   </mark>
 </template>
 
-<script>
+<script lang="ts">
 import { mapMutations } from 'vuex/dist/vuex.cjs.js'
 import Token from './Token'
 import { mapState } from 'vuex'
@@ -81,18 +81,18 @@ export default {
     }
   },
   computed: {
-    ...mapState(['currentPage', 'labelManager']),
+    ...mapState(['currentPage', 'labelManager', 'undoManager']),
   },
   methods: {
     ...mapMutations(['addUndoUpdate']),
     cycleCurrentStatus() {
-      this.addUndoUpdate({ ...this.token })
+      this.undoManager.addUpdateUndo({ ...this.token })
       const nextState = Object.keys(this.states)[(this.states[this.currentState].numeric + 1) % 3] // Cycle through Candidate, Accepted, Rejected
       this.setReviewed(true)
       this.updateState(nextState)
     },
     changeClass() {
-      this.addUndoUpdate({ ...this.token })
+      this.undoManager.addUpdateUndo({ ...this.token })
       this.setReviewed(true)
       if (this.currentPage === 'review') {
         this.updateState('Suggested')
@@ -107,7 +107,7 @@ export default {
     },
     removeBlock() {
       if (this.currentPage == 'review') {
-        this.addUndoUpdate({ ...this.token })
+        this.undoManager.addUpdateUndo({ ...this.token })
         this.updateState('Rejected')
         this.setReviewed(true)
       } else {
